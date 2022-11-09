@@ -13,6 +13,8 @@ Mikhail Matz, UT Austin; matz@utexas.edu
 
 ";
 
+use File::Basename;
+
 print "@ARGV";
 
 my $onto=$ARGV[0] or die $usage;
@@ -47,10 +49,13 @@ elsif ($div eq "MF") { $division="molecular_function";}
 elsif ($div eq "CC") { $division="cellular_component";}
 else { die "unrecognized division: $div\n";}
 
-my $inname2=$measure.".".$div.".tmp";
-my $inname3=$div."_".$measure;
-my $inname31="dissim0_".$div."_".$gen2go;
-my $inname4="dissim_".$div."_".$measure."_".$gen2go;
+($mname,$mdir,$mext) = fileparse($measure,'\..*');
+($aname,$adir,$aext) = fileparse($gen2go,'\..*');
+print "$mname - $mdir - $mext\n";
+my $inname2=$mdir.$mname.".".$div.".tmp";
+my $inname3=$mdir.$mname."_".$div.".tsv";
+my $inname31=$mdir."dissim0_".$div."_".$aname.$aext;
+my $inname4=$mdir."dissim_".$div."_".$mname."_".$aname.$aext;
 
 my @donealready=();
 
@@ -131,7 +136,7 @@ while (<DNDS>){
 		next;
 	}
 	chomp;
-	($seq,$ns)=split(/,/, $_);
+	($seq,$ns)=split(/\t/, $_);
 	if ($seq=~/SEQ/) { $seq.="_s";}
 	$dnds{$seq}=$ns;
 }
@@ -217,7 +222,7 @@ my %desc={};
 my %value={};
 my $des;
 my $go; 
-my $l;
+my $ll;
 my $gn;
 my $val;
 my @gos=();
@@ -228,7 +233,7 @@ my %goi={};
 
 while (<TAB>){
 	chomp;
-	($des,$go,$l,$val,$gn)=split(/\t/,$_);
+	($des,$go,$ll,$val,$gn)=split(/\t/,$_);
 	$value{$gn}=$val;
 	$desc{$go}=$des;
 	push @{$genes{$go}},$gn;
@@ -282,53 +287,53 @@ foreach $go (@gos) { push @goodgo, $go unless ($gonego{$go}==1); }
 
 ################################
 
-	#warn "comparing categories...\n"; 
+#warn "comparing categories...\n"; 
 #my $clfile="cl_".$inname31;
 #if($dones!~/ $clfile /) { 
 
-	use List::Util qw[min max];
-	for ($g1=0;$g1<=$#gos;$g1++){
-		my $go=@gos[$g1];
-		next if ($gonego{$go}==1);
-	#warn "----------------\n$go  $desc{$go}  level $level{$go}\n";
-		my $goos=$go;
-		my $lev=$level{$go};
-		my $dsc=$desc{$go};
-		for ($g2=$g1+1;$g2<=$#gos;$g2++){
-			my $go2=@gos[$g2];	
-			next if ($gonego{$go2}==1);
-			next if ($ggi{$go2}==1);
-			my %seen={}; 
-			my $count=0;
-			my @combo=();
-			if ($lump<=1) {
-				foreach $g (@{$genes{$go}},@{$genes{$go2}}){
-					unless($seen{$g}==1 ){
-						$count++;
-						$seen{$g}=1;
-						push @combo, $g;
-					}
-				}
-				my $shared=$#{$genes{$go}}+1+$#{$genes{$go2}}+1-$count;
-				$overlap{$go,$go2}=min($shared/($#{$genes{$go}}+1),$shared/($#{$genes{$go2}}+1));			
-				$overlap{$go2,$go}=min($shared/($#{$genes{$go}}+1),$shared/($#{$genes{$go2}}+1));			
-			}
-		}
-	}
+use List::Util qw[min max];
+for ($g1=0;$g1<=$#gos;$g1++){
+    my $go=@gos[$g1];
+    next if ($gonego{$go}==1);
+    #warn "----------------\n$go  $desc{$go}  level $level{$go}\n";
+    my $goos=$go;
+    my $lev=$level{$go};
+    my $dsc=$desc{$go};
+    for ($g2=$g1+1;$g2<=$#gos;$g2++){
+        my $go2=@gos[$g2];	
+        next if ($gonego{$go2}==1);
+        next if ($ggi{$go2}==1);
+        my %seen={}; 
+        my $count=0;
+        my @combo=();
+        if ($lump<=1) {
+            foreach $g (@{$genes{$go}},@{$genes{$go2}}){
+                unless($seen{$g}==1 ){
+                    $count++;
+                    $seen{$g}=1;
+                    push @combo, $g;
+                }
+            }
+            my $shared=$#{$genes{$go}}+1+$#{$genes{$go2}}+1-$count;
+            $overlap{$go,$go2}=min($shared/($#{$genes{$go}}+1),$shared/($#{$genes{$go2}}+1));			
+            $overlap{$go2,$go}=min($shared/($#{$genes{$go}}+1),$shared/($#{$genes{$go2}}+1));			
+        }
+    }
+}
 
-	open OUT, ">$inname31" or die "gomwu_b: cannot create output $inname31\n";
-	
-	print {OUT} join("\t",@gos),"\n";
+open OUT, ">$inname31" or die "gomwu_a: cannot create output $inname31\n";
 
-	foreach $go (@gos) {
-		$overlap{$go,$go}=1;
-		foreach $go2 (@gos){
-			print {OUT} sprintf("%.3f",1-$overlap{$go,$go2});;
-			print {OUT} "\t" unless ($go2 eq $gos[$#gos]);
-		}
-		print {OUT} "\n";
-	}
-	close OUT;
+print {OUT} join("\t",@gos),"\n";
+
+foreach $go (@gos) {
+    $overlap{$go,$go}=1;
+    foreach $go2 (@gos){
+        print {OUT} sprintf("%.3f",1-$overlap{$go,$go2});;
+        print {OUT} "\t" unless ($go2 eq $gos[$#gos]);
+    }
+    print {OUT} "\n";
+}
+close OUT;
 #}
 
 #print "calling clusteringGOs.R script ....\n";
